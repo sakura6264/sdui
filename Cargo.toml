@@ -1,0 +1,17 @@
+[package]
+name = "sdui_rs"
+version = "0.1.0"
+edition = "2021"
+
+
+[dependencies]
+pyke-diffusers = "*"
+eframe = "0.19"
+egui_extras = { version = "0.19", features = ["image"] }
+image = { version = "0.24", default-features = false, features = ["png"] }
+rand = "*"
+rfd = "*"
+simple-message-box = "*"
+
+[build-dependencies]
+embed-resource = "*"
