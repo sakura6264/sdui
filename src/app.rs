@@ -191,7 +191,7 @@ impl eframe::App for SDUIApp {
                                             .parent()
                                             .expect("Cannot get parent path.")
                                             .join("models"),
-                                        &StableDiffusionOptions::default(),
+                                        StableDiffusionOptions::default(),
                                     ) {
                                         Ok(p) => p,
                                         Err(e) => {
@@ -205,7 +205,7 @@ impl eframe::App for SDUIApp {
                                     let imgs = pipeline.txt2img(
                                         pprompt,
                                         &mut scheduler,
-                                        &StableDiffusionTxt2ImgOptions {
+                                        StableDiffusionTxt2ImgOptions {
                                             width: w,
                                             height: h,
                                             steps: steps,
