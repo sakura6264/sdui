@@ -10,8 +10,8 @@ fn main() {
         initial_window_pos: Some(egui::Pos2::new(50.0, 50.0)),
         icon_data: Some(IconData{
             rgba: ico.into_raw(),
-            width:256,
-            height: 255,
+            width: 64,
+            height: 64,
         } ),
         ..Default::default()
     };
