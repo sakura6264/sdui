@@ -3,7 +3,7 @@ mod app;
 use app::SDUIApp;
 use eframe::{egui, IconData};
 
-fn main() {
+fn main() ->Result<(),eframe::Error> {
     let ico = image::load_from_memory(include_bytes!("../assets/ico.png")).unwrap().to_rgba8();
     let options = eframe::NativeOptions {
         initial_window_size: Some(egui::Vec2::new(1200.0, 750.0)),
@@ -15,7 +15,7 @@ fn main() {
         } ),
         ..Default::default()
     };
-    eframe::run_native(
+    return eframe::run_native(
         "SDUI",
         options,
         Box::new(|_cc| Box::new(SDUIApp::new())),

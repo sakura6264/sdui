@@ -1,7 +1,8 @@
 use eframe::{egui, emath::Numeric};
 use pyke_diffusers::{
     DDIMScheduler, OrtEnvironment, Prompt, SchedulerOptimizedDefaults, StableDiffusionOptions,
-    StableDiffusionPipeline, StableDiffusionTxt2ImgOptions,
+    StableDiffusionPipeline, StableDiffusionTxt2ImgOptions, DiffusionDevice, DiffusionDeviceControl,
+    StableDiffusionMemoryOptimizedPipeline
 };
 use std::io::{Cursor, Write};
 use std::sync::mpsc::Receiver;
@@ -21,6 +22,8 @@ pub struct SDUIApp {
     hthread: Option<std::thread::JoinHandle<()>>,
     timer: std::time::Instant,
     no_img: egui_extras::RetainedImage,
+    use_dml: bool,
+    use_low_mem: bool,
 }
 
 impl SDUIApp {
@@ -38,6 +41,8 @@ impl SDUIApp {
             hthread: None,
             timer: std::time::Instant::now(),
             no_img: egui_extras::RetainedImage::from_image_bytes("no img", include_bytes!("../assets/no_image.png")).unwrap(),
+            use_dml:true,
+            use_low_mem:false,
         }
     }
 }
@@ -155,6 +160,15 @@ impl eframe::App for SDUIApp {
                                 let h = self.height;
                                 let steps = self.iters;
                                 let seed = self.seed;
+                                let ds = if self.use_dml
+                                 { DiffusionDeviceControl {
+                                    unet: DiffusionDevice::DirectML(0),
+                                    ..Default::default()
+                                }}
+                                else {
+                                    DiffusionDeviceControl::default()
+                                };
+                                let low_mem = self.use_low_mem;
                                 self.timer = std::time::Instant::now();
                                 self.hthread = Some(thread::spawn(move || {
                                     let ortenv = Arc::new(
@@ -184,36 +198,77 @@ impl eframe::App for SDUIApp {
                                                 panic!("Cannot init scheduler: {}", e);
                                             }
                                         };
-                                    let pipeline = match StableDiffusionPipeline::new(
-                                        &ortenv,
-                                        std::env::current_exe()
-                                            .expect("Cannot get current exe path.")
-                                            .parent()
-                                            .expect("Cannot get parent path.")
-                                            .join("models"),
-                                        StableDiffusionOptions::default(),
-                                    ) {
-                                        Ok(p) => p,
-                                        Err(e) => {
-                                            simple_message_box::create_message_box(
-                                                &format!("Cannot init pipeline: {}", e),
-                                                "Error",
-                                            );
-                                            panic!("Cannot init pipeline: {}", e);
-                                        }
-                                    };
-                                    let imgs = pipeline.txt2img(
-                                        pprompt,
-                                        &mut scheduler,
-                                        StableDiffusionTxt2ImgOptions {
-                                            width: w,
-                                            height: h,
-                                            steps: steps,
-                                            seed: Some(seed),
-                                            negative_prompt: Some(Prompt::from(nprompt)),
-                                            ..Default::default()
-                                        },
-                                    );
+                                    let imgs;
+                                    if low_mem {
+                                        let pipeline = match StableDiffusionMemoryOptimizedPipeline::new(
+                                            &ortenv,
+                                            std::env::current_exe()
+                                                .expect("Cannot get current exe path.")
+                                                .parent()
+                                                .expect("Cannot get parent path.")
+                                                .join("models"),
+                                            StableDiffusionOptions { 
+                                                devices: ds,
+                                                ..Default::default()
+                                             },
+                                        ) {
+                                            Ok(p) => p,
+                                            Err(e) => {
+                                                simple_message_box::create_message_box(
+                                                    &format!("Cannot init pipeline: {}", e),
+                                                    "Error",
+                                                );
+                                                panic!("Cannot init pipeline: {}", e);
+                                            }
+                                        };
+                                        imgs = pipeline.txt2img(
+                                            pprompt,
+                                            &mut scheduler,
+                                            StableDiffusionTxt2ImgOptions {
+                                                width: w,
+                                                height: h,
+                                                steps: steps,
+                                                seed: Some(seed),
+                                                negative_prompt: Some(Prompt::from(nprompt)),
+                                                ..Default::default()
+                                            },
+                                        );
+                                    } else {
+                                        let pipeline = match StableDiffusionPipeline::new(
+                                            &ortenv,
+                                            std::env::current_exe()
+                                                .expect("Cannot get current exe path.")
+                                                .parent()
+                                                .expect("Cannot get parent path.")
+                                                .join("models"),
+                                            StableDiffusionOptions { 
+                                                devices: ds,
+                                                ..Default::default()
+                                             },
+                                        ) {
+                                            Ok(p) => p,
+                                            Err(e) => {
+                                                simple_message_box::create_message_box(
+                                                    &format!("Cannot init pipeline: {}", e),
+                                                    "Error",
+                                                );
+                                                panic!("Cannot init pipeline: {}", e);
+                                            }
+                                        };
+                                        imgs = pipeline.txt2img(
+                                            pprompt,
+                                            &mut scheduler,
+                                            StableDiffusionTxt2ImgOptions {
+                                                width: w,
+                                                height: h,
+                                                steps: steps,
+                                                seed: Some(seed),
+                                                negative_prompt: Some(Prompt::from(nprompt)),
+                                                ..Default::default()
+                                            },
+                                        );
+                                    }; 
+                                    
                                     let img = match imgs {
                                         Ok(imgs) => imgs[0].to_rgb8(),
                                         Err(e) => {
@@ -256,6 +311,35 @@ impl eframe::App for SDUIApp {
                             ui.spinner();
                             ui.label("Generating...");
                         }
+                    });
+                    ui.add_space(10.0);
+                    ui.horizontal(|ui|{
+                        ui.label("Device: ");
+                        if ui.button(
+                            if self.use_dml {
+                                "DirectML"
+                            } else {
+                                "CPU"
+                            }
+                        ).clicked() {
+                            self.use_dml = !self.use_dml;
+                        };
+                        ui.label("Low Memory: ");
+                        if ui.button(
+                            if self.use_low_mem  {
+                                "ON "
+                            } else {
+                                "OFF"
+                            }
+                        ).on_hover_text(
+                            if self.use_low_mem {
+                                "Use low memory mode, but slower."
+                            } else {
+                                "Use high memory mode, but faster."
+                            }
+                        ).clicked() {
+                            self.use_low_mem = !self.use_low_mem;
+                        };
                     });
                     ui.add_space(200.0);
                     ui.label("Tips: use () to increase the weight and [] to decrease.");
