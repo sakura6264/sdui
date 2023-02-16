@@ -1,8 +1,8 @@
 use eframe::{egui, emath::Numeric};
 use pyke_diffusers::{
-    DDIMScheduler, OrtEnvironment, Prompt, SchedulerOptimizedDefaults, StableDiffusionOptions,
-    StableDiffusionPipeline, StableDiffusionTxt2ImgOptions, DiffusionDevice, DiffusionDeviceControl,
-    StableDiffusionMemoryOptimizedPipeline
+    DDIMScheduler, DiffusionDevice, DiffusionDeviceControl, OrtEnvironment, Prompt,
+    SchedulerOptimizedDefaults, StableDiffusionMemoryOptimizedPipeline, StableDiffusionOptions,
+    StableDiffusionPipeline, StableDiffusionTxt2ImgOptions,
 };
 use std::io::{Cursor, Write};
 use std::sync::mpsc::Receiver;
@@ -40,9 +40,13 @@ impl SDUIApp {
             recvchannel: None,
             hthread: None,
             timer: std::time::Instant::now(),
-            no_img: egui_extras::RetainedImage::from_image_bytes("no img", include_bytes!("../assets/no_image.png")).unwrap(),
-            use_dml:true,
-            use_low_mem:false,
+            no_img: egui_extras::RetainedImage::from_image_bytes(
+                "no img",
+                include_bytes!("../assets/no_image.png"),
+            )
+            .unwrap(),
+            use_dml: true,
+            use_low_mem: false,
         }
     }
 }
@@ -160,12 +164,12 @@ impl eframe::App for SDUIApp {
                                 let h = self.height;
                                 let steps = self.iters;
                                 let seed = self.seed;
-                                let ds = if self.use_dml
-                                 { DiffusionDeviceControl {
-                                    unet: DiffusionDevice::DirectML(0),
-                                    ..Default::default()
-                                }}
-                                else {
+                                let ds = if self.use_dml {
+                                    DiffusionDeviceControl {
+                                        unet: DiffusionDevice::DirectML(0),
+                                        ..Default::default()
+                                    }
+                                } else {
                                     DiffusionDeviceControl::default()
                                 };
                                 let low_mem = self.use_low_mem;
@@ -200,27 +204,28 @@ impl eframe::App for SDUIApp {
                                         };
                                     let imgs;
                                     if low_mem {
-                                        let pipeline = match StableDiffusionMemoryOptimizedPipeline::new(
-                                            &ortenv,
-                                            std::env::current_exe()
-                                                .expect("Cannot get current exe path.")
-                                                .parent()
-                                                .expect("Cannot get parent path.")
-                                                .join("models"),
-                                            StableDiffusionOptions { 
-                                                devices: ds,
-                                                ..Default::default()
-                                             },
-                                        ) {
-                                            Ok(p) => p,
-                                            Err(e) => {
-                                                simple_message_box::create_message_box(
-                                                    &format!("Cannot init pipeline: {}", e),
-                                                    "Error",
-                                                );
-                                                panic!("Cannot init pipeline: {}", e);
-                                            }
-                                        };
+                                        let pipeline =
+                                            match StableDiffusionMemoryOptimizedPipeline::new(
+                                                &ortenv,
+                                                std::env::current_exe()
+                                                    .expect("Cannot get current exe path.")
+                                                    .parent()
+                                                    .expect("Cannot get parent path.")
+                                                    .join("models"),
+                                                StableDiffusionOptions {
+                                                    devices: ds,
+                                                    ..Default::default()
+                                                },
+                                            ) {
+                                                Ok(p) => p,
+                                                Err(e) => {
+                                                    simple_message_box::create_message_box(
+                                                        &format!("Cannot init pipeline: {}", e),
+                                                        "Error",
+                                                    );
+                                                    panic!("Cannot init pipeline: {}", e);
+                                                }
+                                            };
                                         imgs = pipeline.txt2img(
                                             pprompt,
                                             &mut scheduler,
@@ -241,10 +246,10 @@ impl eframe::App for SDUIApp {
                                                 .parent()
                                                 .expect("Cannot get parent path.")
                                                 .join("models"),
-                                            StableDiffusionOptions { 
+                                            StableDiffusionOptions {
                                                 devices: ds,
                                                 ..Default::default()
-                                             },
+                                            },
                                         ) {
                                             Ok(p) => p,
                                             Err(e) => {
@@ -267,8 +272,8 @@ impl eframe::App for SDUIApp {
                                                 ..Default::default()
                                             },
                                         );
-                                    }; 
-                                    
+                                    };
+
                                     let img = match imgs {
                                         Ok(imgs) => imgs[0].to_rgb8(),
                                         Err(e) => {
@@ -313,31 +318,24 @@ impl eframe::App for SDUIApp {
                         }
                     });
                     ui.add_space(10.0);
-                    ui.horizontal(|ui|{
+                    ui.horizontal(|ui| {
                         ui.label("Device: ");
-                        if ui.button(
-                            if self.use_dml {
-                                "DirectML"
-                            } else {
-                                "CPU"
-                            }
-                        ).clicked() {
+                        if ui
+                            .button(if self.use_dml { "DirectML" } else { "CPU" })
+                            .clicked()
+                        {
                             self.use_dml = !self.use_dml;
                         };
                         ui.label("Low Memory: ");
-                        if ui.button(
-                            if self.use_low_mem  {
-                                "ON "
-                            } else {
-                                "OFF"
-                            }
-                        ).on_hover_text(
-                            if self.use_low_mem {
+                        if ui
+                            .button(if self.use_low_mem { "ON " } else { "OFF" })
+                            .on_hover_text(if self.use_low_mem {
                                 "Use low memory mode, but slower."
                             } else {
                                 "Use high memory mode, but faster."
-                            }
-                        ).clicked() {
+                            })
+                            .clicked()
+                        {
                             self.use_low_mem = !self.use_low_mem;
                         };
                     });
